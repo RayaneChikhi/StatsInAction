@@ -13,18 +13,14 @@ boxplot(Glu ~ Diabete, data = data_comparison)
 # We notice that the variances for each diabete category are very different (indeed the
 # boxes have varying lengths). Furthermore, the distribution of Glu within each category does not appear to be normal:
 # for instance, in group 2, there are many outliers. In group 1, the distribution does not appear to be symmetrical.
-# Thus, we use a Wilcoxon test, which does not assume normality of the data.
-
+# We will still be using a t.test as we have a large amount of data. The central limit theorem justifies this choice.
+# However the variances are different, hence we use a Welch test.
 head(data_comparison)
-wilcox.test(Glu ~ Diabete, data = data_comparison)
-
-# We obtain a p-value of 7.9e-6 < 0.05: the test is significant. We conclude that
-# there is a significant difference between these two categories.
-
-# We also use a Welch test, since the question is about comparing means
-# and this test does not assume equal variances.
 
 t.test(Glu ~ Diabete, data = data_comparison)
+
+# We obtain a p-value of 0.01023 < 0.05: the test is significant. We conclude that
+# there is a significant difference between these two categories.
 
 # Question 2)
 
@@ -32,19 +28,14 @@ diabetic <- subset(data, Diabete == 1 & (age_group == "Adult" | age_group == "Se
 boxplot(Glu ~ age_group, data = diabetic)
 
 # Again the data distribution for the adults is highly asymmetrical, meaning
-# it would not be coherent to assume its distribution is normal. Furthermore,
+# But we still have a lot of data. Furthermore,
 # the variance between both groups is highly different. Hence, we use
-# a Wilcoxon test once again.
-
-wilcox.test(Glu ~ age_group, data = diabetic)
-
-# We obtain a p-value of 0.08857 > 0.05. Hence, the test does not provide
-# significant evidence of a difference between the two groups at the 5% level.
-# We also cannot conclude that the two groups are the same.
-
-# We also use a Welch test, since the question is about comparing means.
+# a Welch test once again.
 
 t.test(Glu ~ age_group, data = diabetic)
+
+# We obtain a p-value of 0.04363 < 0.05. Hence, we conclude that the means between
+# the two groups are not the same.
 
 # Question 3)
 
@@ -56,18 +47,8 @@ table(adults_diabetic$Phys_activ)
 # "yes" or "no" for their physical activity. 4 people answered yes and 9 answered no.
 # Hence, the comparison is based on very small subgroup sizes, so the inference
 # is not very reliable.
-
-# If we use a Wilcoxon test, we will most likely obtain a large p-value for that reason.
-
-wilcox.test(Glu ~ Phys_activ, data = adults_diabetic)
-
-# Indeed, the p-value is very large: 0.9384. The test does not provide significant
-# evidence of a difference between the two groups, but the sample sizes are too small
-# for this comparison to be very informative.
-
-# We also use a Welch test, since the question is about comparing means.
-
-t.test(Glu ~ Phys_activ, data = adults_diabetic)
+# Furthermore, we do not have enough data to have convergence from the central limit theorem.
+# Hence we cannot use a t.test here.
 
 # Question 4)
 
