@@ -87,7 +87,7 @@ fisher.test(table_binaire)
 liver_data <- load("liver_data.rda")
 liver[1:5, 1:5]
 
-# Question 1
+# Question 1) 
 
 correlations <- cor(liver[, 1], liver[, -1])
 indice_max <- which.max(abs(correlations))
