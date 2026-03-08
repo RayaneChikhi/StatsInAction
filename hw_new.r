@@ -150,119 +150,182 @@ length(discoveries_bonf)
 # Exercice 3
 
 # Question 1
-
 library(readr)
+
 data_3 <- read.table("data_exo3.csv", sep = "t", header = TRUE, dec = ",")
 head(data_3)
-plot(data_3, pch = 21, cex = 3, lwd = 5, col = "darkblue", bg = "skyblue")
+
+plot(data_3, 
+     pch = 21, cex = 3, lwd = 5, 
+     col = "darkblue", bg = "skyblue",
+     main = "Données data_exo3",
+     xlab = "x", ylab = "y")
 
 # Question 2
 
-# We start by creating a grid to plot our fits
-
 x_grid <- seq(min(data_3$x), max(data_3$x), length.out = 100)
 num_deg <- 12
-colors <- rainbow(num_deg)
-adjr2 <- numeric(num_deg)
-aics <- numeric(num_deg)
+colors  <- rainbow(num_deg)
+adjr2   <- numeric(num_deg)
+aics    <- numeric(num_deg)
+bics    <- numeric(num_deg)
+
+plot(data_3, 
+     pch = 21, cex = 3, lwd = 5,
+     col = "darkblue", bg = "skyblue",
+     main = "Ajustements polynomiaux (degrés 1 à 12)",
+     xlab = "x", ylab = "y")
 
 for (i in 1:num_deg) {
-    fit <- lm(y ~ poly(x, i), data = data_3)
-    s <- summary(fit)
-    adjr2[i] <- s$adj.r.squared
-    aics[i] <- AIC(fit)
-
-    y_pred = predict(fit, newdata = data.frame(x = x_grid))
-    lines(x_grid, y_pred, lwd = 2, col = colors[i])
+  fit      <- lm(y ~ poly(x, i), data = data_3)
+  s        <- summary(fit)
+  adjr2[i] <- s$adj.r.squared
+  aics[i]  <- AIC(fit)
+  bics[i]  <- BIC(fit)
+  
+  y_pred <- predict(fit, newdata = data.frame(x = x_grid))
+  lines(x_grid, y_pred, lwd = 2, col = colors[i])
 }
-legend("topright", legend = paste("Degree", 1:num_deg), 
+
+legend("topright", legend = paste("Degré", 1:num_deg),
        col = colors, lwd = 2, cex = 0.7, bg = "white")
 
-best_deg_r2_adj <- which.max(adjr2)
-best_deg_AIC <- which.min(aics)
+best_deg_r2  <- which.max(adjr2)
+best_deg_aic <- which.min(aics)
+best_deg_bic <- which.min(bics)
 
-print(paste("The degree chosen by the R2-adj criterion is given by:", best_deg_r2_adj))
-print(paste("The degree chosen by the AIC criterion is given by:", best_deg_AIC))
+cat("Degré choisi par R²-ajusté :", best_deg_r2,  "\n")
+cat("Degré choisi par AIC        :", best_deg_aic, "\n")
+cat("Degré choisi par BIC        :", best_deg_bic, "\n")
 
-fit_r2_adj <- lm(y ~ poly(x, best_deg_r2_adj), data = data_3)
-pred_r2_adj <- predict(fit_r2_adj, newdata = data.frame(x = x_grid))
-lines(x_grid, pred_r2_adj, lwd = 5, col = "firebrick")
+par(mfrow = c(1, 3))
 
-summary(fit_r2_adj)
+plot(1:num_deg, adjr2, type = "b", pch = 19, col = "steelblue",
+     main = "R² ajusté selon le degré",
+     xlab = "Degré", ylab = "R² ajusté")
+abline(v = best_deg_r2, col = "red", lty = 2)
 
-# The adjusted R^2 and AIC criteria both suggest that degree 12 should be chosen.
-# However, it seems as though the associated polynomial is overfitting our
-# relatively small dataset. Graphically, we decide to keep the degree 5 polynomial,
-# which seems to represent the data appropriately without overfitting.
+plot(1:num_deg, aics, type = "b", pch = 19, col = "darkorange",
+     main = "AIC selon le degré",
+     xlab = "Degré", ylab = "AIC")
+abline(v = best_deg_aic, col = "red", lty = 2)
 
-chosen_polynomial <- lm(y ~ poly(x, 5), data = data_3)
-plot(data_3, pch = 21, cex = 3, lwd = 5, col = "darkblue", bg = "skyblue")
-y_pred <- predict(chosen_polynomial, newdata = data.frame(x = x_grid))
-lines(x_grid, y_pred, lwd = 5, col = "firebrick")
-summary(chosen_polynomial)
+plot(1:num_deg, bics, type = "b", pch = 19, col = "darkgreen",
+     main = "BIC selon le degré",
+     xlab = "Degré", ylab = "BIC")
+abline(v = best_deg_bic, col = "red", lty = 2)
+
+par(mfrow = c(1, 1))
+
+# Both AIC and R²-adjusted pick degree 12, but with only 30 observations
+# that's clearly overfitting — p-values for terms above degree 6 are huge.
+# BIC penalizes complexity more heavily and tends to pick a lower degree.
+# Degree 5 looks like the sweet spot: captures the trend without going overboard.
+
+chosen_deg <- 5
+fit_chosen <- lm(y ~ poly(x, chosen_deg), data = data_3)
+summary(fit_chosen)
+
+plot(data_3, 
+     pch = 21, cex = 3, lwd = 5,
+     col = "darkblue", bg = "skyblue",
+     main = "Polynôme de degré 5 sélectionné",
+     xlab = "x", ylab = "y")
+y_pred_chosen <- predict(fit_chosen, newdata = data.frame(x = x_grid))
+lines(x_grid, y_pred_chosen, lwd = 3, col = "firebrick")
 
 # Question 3
 
-fit_nls <- nls(y ~ a / (1 + exp(-b * (x - c))), 
-               data = data_3, 
-               start = list(a = max(data_3$y), 
-                            b = 0.5, 
-                            c = mean(data_3$x)))
+# The data follows an S-shaped decay toward a lower plateau, so a sigmoid fits naturally.
+# We use: y = a / (1 + exp(b * (x - c))) + d
+# where a = amplitude, b = steepness, c = inflection point, d = lower asymptote
 
-y_nls <- predict(fit_nls, newdata = data.frame(x = x_grid))
-lines(x_grid, y_nls, col = "purple", lwd = 4)
+fit_nls <- nls(y ~ a / (1 + exp(b * (x - cc))) + d,
+               data  = data_3,
+               start = list(a = 33, b = 1, cc = 3, d = 2))
 
 summary(fit_nls)
 
-# Two distinct modeling approaches were evaluated for this dataset:
-# a 5th-degree polynomial regression and a non-linear sigmoidal model.
-# From a purely statistical performance standpoint, the polynomial model
-# gives a very good fit, with a Residual Standard Error of 3.71 and a high
-# R^2 of 0.955. However, the non-linear model is also interesting,
-# since it seems to capture the general shape of the data well.
+y_nls <- predict(fit_nls, newdata = data.frame(x = x_grid))
+
+plot(data_3,
+     pch = 21, cex = 3, lwd = 5,
+     col = "darkblue", bg = "skyblue",
+     main = "Comparaison : Polynôme degré 5 vs NLS",
+     xlab = "x", ylab = "y")
+lines(x_grid, y_pred_chosen, lwd = 3, col = "firebrick", lty = 1)
+lines(x_grid, y_nls,         lwd = 3, col = "purple",    lty = 2)
+legend("topright",
+       legend = c("Polynôme degré 5", "NLS : a / (1 + exp(b*(x-c))) + d"),
+       col = c("firebrick", "purple"), lwd = 3, lty = c(1, 2), bty = "n")
+
+# The polynomial fits better statistically, but the sigmoid only needs 4 parameters
+# vs 6 and is much easier to interpret. It also extrapolates sensibly —
+# converging to d as x grows — while the polynomial just diverges.
 
 # Question 4
 
-x_new_data <- data.frame(x = 1:10)
+x_new <- data.frame(x = 1:10)
 
-conf_int <- predict(chosen_polynomial, newdata = x_new_data, interval = "confidence")
-pred_int <- predict(chosen_polynomial, newdata = x_new_data, interval = "prediction")
+conf_int <- predict(fit_chosen, newdata = x_new, interval = "confidence", level = 0.95)
+pred_int <- predict(fit_chosen, newdata = x_new, interval = "prediction", level = 0.95)
 
-print("Confidence Intervals (Average):")
-print(conf_int)
+cat("\nIntervalles de confiance pour E(Y_new) :\n")
+print(round(data.frame(x = 1:10, conf_int), 3))
 
-print("Prediction Intervals (Individual):")
-print(pred_int)
+cat("\nIntervalles de prédiction pour Y_new :\n")
+print(round(data.frame(x = 1:10, pred_int), 3))
 
-# Graph for the fitted values, confidence intervals and prediction intervals
+x_grid_full <- seq(0, 12, length.out = 300)
 
-plot(data_3$x, data_3$y, pch = 21, cex = 2, lwd = 3, col = "darkblue", bg = "skyblue",
-     xlim = c(min(data_3$x), max(x_new_data$x)),
-     ylim = range(c(data_3$y, conf_int, pred_int)),
-     xlab = "x", ylab = "y",
-     main = "Fitted values with confidence and prediction intervals")
+conf_full <- predict(fit_chosen, 
+                     newdata = data.frame(x = x_grid_full), 
+                     interval = "confidence", level = 0.95)
+pred_full <- predict(fit_chosen, 
+                     newdata = data.frame(x = x_grid_full), 
+                     interval = "prediction", level = 0.95)
 
-x_grid2 <- seq(min(data_3$x), max(x_new_data$x), length.out = 200)
-y_grid2 <- predict(chosen_polynomial, newdata = data.frame(x = x_grid2))
-lines(x_grid2, y_grid2, lwd = 3, col = "firebrick")
+plot(data_3,
+     pch = 21, cex = 3, lwd = 5,
+     col = "darkblue", bg = "skyblue",
+     xlim = c(0, 12), ylim = range(pred_full),
+     main = "Intervalles de confiance et de prédiction (degré 5)",
+     xlab = "x", ylab = "y")
 
-lines(x_new_data$x, conf_int[, "lwr"], col = "darkgreen", lwd = 2, lty = 2)
-lines(x_new_data$x, conf_int[, "upr"], col = "darkgreen", lwd = 2, lty = 2)
+polygon(c(x_grid_full, rev(x_grid_full)),
+        c(pred_full[, "lwr"], rev(pred_full[, "upr"])),
+        col = rgb(0.8, 0.8, 0.8, 0.5), border = NA)
 
-lines(x_new_data$x, pred_int[, "lwr"], col = "purple", lwd = 2, lty = 3)
-lines(x_new_data$x, pred_int[, "upr"], col = "purple", lwd = 2, lty = 3)
+polygon(c(x_grid_full, rev(x_grid_full)),
+        c(conf_full[, "lwr"], rev(conf_full[, "upr"])),
+        col = rgb(0.4, 0.6, 1, 0.4), border = NA)
 
-points(x_new_data$x, conf_int[, "fit"], pch = 19, col = "black")
+lines(x_grid_full, conf_full[, "fit"], lwd = 3, col = "firebrick")
+
+lines(x_grid_full, conf_full[, "lwr"], lwd = 1.5, col = "blue",  lty = 2)
+lines(x_grid_full, conf_full[, "upr"], lwd = 1.5, col = "blue",  lty = 2)
+lines(x_grid_full, pred_full[, "lwr"], lwd = 1.5, col = "black", lty = 3)
+lines(x_grid_full, pred_full[, "upr"], lwd = 1.5, col = "black", lty = 3)
+
+points(1:10, predict(fit_chosen, newdata = x_new),
+       pch = 23, cex = 2, col = "black", bg = "yellow", lwd = 2)
 
 legend("topright",
-       legend = c("Observed data", "Polynomial fit", "Confidence interval", "Prediction interval"),
-       col = c("darkblue", "firebrick", "darkgreen", "purple"),
-       pch = c(21, NA, NA, NA),
-       pt.bg = c("skyblue", NA, NA, NA),
-       lty = c(NA, 1, 2, 3),
-       lwd = c(NA, 3, 2, 2),
-       bty = "n")
+       legend = c("Ajustement (degré 5)",
+                  "IC 95% pour E(Y_new)",
+                  "IP 95% pour Y_new",
+                  "x_new = 1,...,10"),
+       col    = c("firebrick", "blue", "black", "black"),
+       lwd    = c(3, 1.5, 1.5, NA),
+       lty    = c(1, 2, 3, NA),
+       pch    = c(NA, NA, NA, 23),
+       pt.bg  = c(NA, NA, NA, "yellow"),
+       bty    = "n", cex = 0.85)
 
+# The CI is narrow where data is dense and widens outside that range.
+# The PI is always wider since it also accounts for individual observation variability.
+# For x_new in {1,...,10} both intervals stay reasonable, but beyond x = 11
+# the polynomial extrapolation gets unreliable fast.
 
 # Exercice 4
 
@@ -276,8 +339,7 @@ head(sp)
 
 # Question 2)
 
-# First we fit the normal model by using the MLE estimators of the
-# mean and standard deviation.
+# We fit the normal model using MLE estimators for the mean and standard deviation.
 
 returns <- sp$daily_return
 mu_hat <- mean(returns)
@@ -285,21 +347,20 @@ sigma_hat <- sd(returns)
 cat("Estimated Mean (mu):", mu_hat, "\n")
 cat("Estimated Std Dev (sigma):", sigma_hat, "\n")
 
-# Let us first plot the fitted normal distribution along with the samples.
+# Let's plot the fitted normal distribution over the data.
 
 hist(returns, probability = TRUE, main = "Normal Fit to Daily Returns", col = "lightblue")
 x_seq <- seq(min(returns), max(returns), length.out = 100)
 y_norm <- dnorm(x_seq, mean = mu_hat, sd = sigma_hat)
 lines(x_seq, y_norm, col = "red", lwd = 2)
 
-# We can go further by using a QQ plot:
+# We can go further with a QQ plot:
 
 qqnorm(returns)
 qqline(returns, col = "red")
 
-# We see that the normal distribution is not a good fit. Indeed, the
-# empirical distribution has much more extreme outliers than a normal distribution
-# typically would.
+# The normal distribution clearly doesn't fit well — the data has way more
+# extreme values than a normal would ever produce.
 
 # Question 3
 
@@ -384,22 +445,19 @@ for (p in 2:6) {
 
 par(mfrow = c(1, 1))
 
-# Visually, the Mixture of Normals is a vastly superior fit compared to the single Normal model.
-# While the single Normal (p = 1) fails to capture the high peak at the center and the extreme
-# outliers in the tails, the Mixture models provide a much better description of the empirical density.
-# In particular, p = 2 or p = 3 already seem to fit the data much better than the Normal model.
+# The GMM is a much better fit than a single Normal. The Normal misses the sharp
+# peak in the center and the heavy tails, while even p = 2 or p = 3 already
+# captures the shape of the data quite well.
 
 # Question 4.a)
 
-# The shift from a Gaussian (Normal) framework to a Student-t distribution is
-# primarily driven by the empirical failure of the Normal distribution to
-# account for extreme events (outliers) in financial data.
+# The main reason we move from Normal to Student-t is that the Normal simply
+# fails to account for extreme returns in financial data.
 #
-# The key advantage is the 'nu' (degrees of freedom) parameter.
-# Unlike the Normal distribution, the Student-t has heavier tails.
-# This allows it to assign a more realistic probability to large returns.
+# The key is the 'nu' (degrees of freedom) parameter — it controls how heavy
+# the tails are, making large returns much more plausible than under a Normal.
 #
-# The Student-t model also remains relatively simple, with only 3 parameters:
+# It's also still a simple model with just 3 parameters:
 # m (location), a (scale), and nu (degrees of freedom).
 
 # Question 4.b)
@@ -468,8 +526,8 @@ plot(theoretical_quantiles, y_sorted,
 abline(0, 1, col = "red", lwd = 2)
 grid()
 
-# The Student-t fit still struggles with some outliers, although it seems better
-# than the normal distribution fit.
+# The Student-t still struggles with some outliers, but it's noticeably
+# better than the Normal.
 
 # Question 5)
 
@@ -561,15 +619,13 @@ grid()
 # Reset layout
 par(mfrow = c(1, 1))
 
-# The Q-Q plots confirm that the GMM provides the best fit among the models compared,
-# which is consistent with the BIC results.
+# The Q-Q plots confirm that the GMM fits best, which lines up with what the BIC told us.
 
 # Question 6)
 
-# Due to the large amount of data, the central limit theorem allows us to use a t-test.
+# With this much data, the CLT kicks in and we can safely use a t-test.
 
 test_mu <- t.test(sp$daily_return, mu = 0)
 print(test_mu)
 
 print("We do not reject H0: the data do not provide significant evidence that the mean daily return differs from 0.")
-
