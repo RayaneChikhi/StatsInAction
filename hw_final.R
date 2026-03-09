@@ -18,8 +18,8 @@ data_comparison <- subset(data, Diabete==1 | Diabete==2)
 head(data_comparison)
 wilcox.test(Glu ~ Diabete, data = data_comparison)
 
-# We obtain a p-value of 7.9e-6 < 0.05 : the test is significant. We conclude that
-# the mean values for these two categories are not the same.
+# We obtain a p-value of 7.9e-6 < 0.05 : the test is significant. We conclude that 
+# the glucose distributions differ significantly between the two groups.
 
 # Question 2)
 
@@ -51,7 +51,9 @@ table(adults_diabetic$Phys_activ)
 
 wilcox.test(Glu ~ Phys_activ, data=adults_diabetic)
 
-# Indeed the p-value is extremely large: 0.9384. We cannot test for this.
+# Indeed the p-value is extremely large: 0.9384. Wilcoxon test can be performed, 
+# but with only 4 vs 9 observations, its power is extremely limited, 
+# so the non-significant result should be interpreted with great caution
 
 # Question 4)
 
@@ -70,12 +72,12 @@ fisher.test(table_binaire)
 
 # Exercice 2
 
-liver_data <- load("liver_data.rda")
+load("liver_data.rda")
 liver[1:5, 1:5]
 # Question 1
 
 correlations <- cor(liver[, 1], liver[, -1])
-indice_max <- which.max(correlations)
+indice_max <- which.max(abs(correlations))
 noms_genes <- colnames(liver)[-1]
 
 gene_top <- noms_genes[indice_max]
@@ -112,12 +114,14 @@ print(p_values)
 
 # Question 3
 
-p_values <- sort(p_values)
-plot(p_values)
-curve(x/3116, from=1, to=3116, col="red", lwd=2, 
-      main="Graph of f(x) = x/3116",
-      xlab="Index", ylab="Theoretical threshold")
-abline(a=0, b=1/3116, col="red", lwd=2)
+p_values_sorted <- sort(p_values)
+ranks <- 1:length(p_values_sorted)
+
+plot(ranks, p_values_sorted, pch = 20,
+     xlab = "Rank",
+     ylab = "Ordered p-values",
+     main = "Ordered p-values vs rank")
+abline(a = 0, b = 1/3116, col = "red", lwd = 2)
 
 # The p_values curve is clearly below x->x/3116 meaning the p-values
 # are significant. (Il y a un concept sous-jacent du cours mais je l'ai pas en tête là)
@@ -294,7 +298,7 @@ legend("topleft",
        bty = "n", cex = 0.8)
 
 
-# Exercice 5
+# Exercice 4
 
 # Question 1)
 
@@ -325,8 +329,20 @@ lines(x_seq, y_norm, col = "red", lwd = 2)
 
 # We can go further by using a QQ plot:
 
-qqnorm(returns)
-qqline(returns, col = "red")
+y_sorted <- sort(returns)
+n <- length(y_sorted)
+probs <- ((1:n) - 0.5) / n
+
+theoretical_q_norm <- qnorm(probs, mean = mu_hat, sd = sigma_hat)
+
+plot(theoretical_q_norm, y_sorted,
+     main = "Q-Q Plot: Fitted Normal Distribution",
+     xlab = "Theoretical Quantiles of N(mu_hat, sigma_hat^2)",
+     ylab = "Empirical Quantiles of Daily Returns",
+     pch = 20, col = "darkblue")
+
+abline(0, 1, col = "red", lwd = 2)
+grid()
 
 # We see that the normal distribution is not a good fit. Indeed, we see that
 # the empirical distribution has much more extreme outliers than a normal distribution
@@ -416,14 +432,36 @@ for (p in 2:6) {
 
 par(mfrow = c(1, 1))
 
+# Superposition of the fitted GMM densities for p = 2 and p = 3
+
+fit_gmm2 <- mixture_gaussian_hand(returns, p = 2)
+fit_gmm3 <- mixture_gaussian_hand(returns, p = 3)
+
+y_gmm2 <- calc_mixture_density(x_grid, fit_gmm2$parameters)
+y_gmm3 <- calc_mixture_density(x_grid, fit_gmm3$parameters)
+
+hist(returns, breaks = 50, probability = TRUE,
+     main = "Comparison of fitted GMM densities: p = 2 vs p = 3",
+     col = "lightgray", border = "white",
+     xlab = "Daily returns", ylab = "Density")
+
+lines(x_grid, y_gmm2, lwd = 3, col = "blue")
+lines(x_grid, y_gmm3, lwd = 3, col = "darkgreen", lty = 2)
+
+legend("topright",
+       legend = c("GMM p = 2", "GMM p = 3"),
+       col = c("blue", "darkgreen"),
+       lwd = 3,
+       lty = c(1, 2),
+       bty = "n")
+
 # Visually, the Mixture of Normals is a vastly superior fit compared to the single Normal model. 
 # While the single Normal ($p=1$) fails to capture the high peak at the center and the extreme 
 # outliers in the tails (as seen in the Q-Q plot), the Mixture models effectively allocate different components to handle different 'volatility regimes.' 
 # Specifically, a $p=2$ or $p=3$ model provides a much better description of the empirical density without the excessive complexity of higher $p$ values.
 
 
-# Question 4.a: see report
-
+# Question 4.a: see report 
 # Question 4.b)
 
 log_lik_student <- function(theta, x) {
@@ -503,19 +541,19 @@ n_obs <- length(returns)
 logL_norm <- sum(dnorm(returns, mean = mean(returns), sd = sd(returns), log = TRUE))
 bic_norm <- -2 * logL_norm + 2 * log(n_obs)
 
-# 2. BIC for GMM (p = 5) (Question 3)
+# 2. BIC for GMM (p = 3) (Question 3)
 
-fit_gmm5 <- mixture_gaussian_hand(returns, p = 5)
-bic_gmm5 <- -2 * fit_gmm5$loglik + (3 * 5 - 1) * log(n_obs)
+fit_gmm3 <- mixture_gaussian_hand(returns, p = 3)
+bic_gmm3 <- -2 * fit_gmm3$loglik + (3 * 3 - 1) * log(n_obs)
 
 # 3. BIC for Student-t Model (Question 4)
 bic_t <- -2 * logL_t + 3 * log(n_obs)
 
 bic_comparison <- data.frame(
-  Model = c("Normal (p=1)", "GMM (p=5)", "Student-t"),
-  Parameters = c(2, 14, 3),
-  LogLikelihood = c(logL_norm, fit_gmm5$loglik, logL_t),
-  BIC = c(bic_norm, bic_gmm5, bic_t)
+  Model = c("Normal (p=1)", "GMM (p=3)", "Student-t"),
+  Parameters = c(2, 8, 3),
+  LogLikelihood = c(logL_norm, fit_gmm3$loglik, logL_t),
+  BIC = c(bic_norm, bic_gmm3, bic_t)
 )
 
 print(bic_comparison)
@@ -536,27 +574,32 @@ get_gmm_quantiles <- function(probs, params) {
   }
   return(approx(x = cdf_gmm, y = x_grid_q, xout = probs)$y)
 }
-theoretical_q_gmm5 <- get_gmm_quantiles(probs, fit_gmm5$parameters)
+theoretical_q_gmm3 <- get_gmm_quantiles(probs, fit_gmm3$parameters)
 
 theoretical_q_t <- theta_mle[2] + theta_mle[3] * qt(probs, df = theta_mle[1])
 
 
 
-par(mfrow = c(1, 3), mar = c(5, 4, 4, 1)) 
+x_lim <- c(-300, 300)
+y_lim <- range(y_sorted, na.rm = TRUE)
+
+par(mfrow = c(1, 3), mar = c(5, 4, 4, 1))
 
 plot(theoretical_q_norm, y_sorted, 
      main = "Q-Q Plot: Normal",
      xlab = "Theoretical Normal Quantiles",
      ylab = "Empirical Quantiles",
-     pch = 20, col = "red")
+     pch = 20, col = "red",
+     xlim = x_lim, ylim = y_lim)
 abline(0, 1, col = "black", lwd = 2)
 grid()
 
-plot(theoretical_q_gmm5, y_sorted, 
-     main = "Q-Q Plot: GMM p=5",
+plot(theoretical_q_gmm3, y_sorted, 
+     main = "Q-Q Plot: GMM p=3",
      xlab = "Theoretical GMM Quantiles",
      ylab = "Empirical Quantiles",
-     pch = 20, col = "darkgreen")
+     pch = 20, col = "darkgreen",
+     xlim = x_lim, ylim = y_lim)
 abline(0, 1, col = "black", lwd = 2)
 grid()
 
@@ -564,7 +607,8 @@ plot(theoretical_q_t, y_sorted,
      main = "Q-Q Plot: Student-t",
      xlab = "Theoretical Student-t Quantiles",
      ylab = "Empirical Quantiles",
-     pch = 20, col = "darkorchid")
+     pch = 20, col = "darkorchid",
+     xlim = x_lim, ylim = y_lim)
 abline(0, 1, col = "black", lwd = 2)
 grid()
 
@@ -572,6 +616,28 @@ par(mfrow = c(1, 1))
 
 # The QQ plot and the BIC for the GMM is the best. We use the GMM.
 
+
+x_grid <- seq(min(returns), max(returns), length.out = 1000)
+
+fit_gmm3 <- mixture_gaussian_hand(returns, p = 3)
+y_gmm3 <- calc_mixture_density(x_grid, fit_gmm3$parameters)
+
+y_t <- dt_ls(x_grid, theta_mle[1], theta_mle[2], theta_mle[3])
+
+
+hist(returns, breaks = 50, probability = TRUE,
+     main = "Empirical histogram with GMM p=3 and Student-t fits",
+     col = "lightgray", border = "white",
+     xlab = "Returns", ylab = "Density")
+
+lines(x_grid, y_gmm3, lwd = 2, col = "darkgreen")
+
+lines(x_grid, y_t, lwd = 2, col = "purple")
+
+legend("topright",
+       legend = c("GMM p=3", "Student-t"),
+       col = c("darkgreen", "purple"),
+       lwd = 2, bty = "n")
 
 # Question 6)
 
