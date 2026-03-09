@@ -77,7 +77,7 @@ liver[1:5, 1:5]
 # Question 1
 
 correlations <- cor(liver[, 1], liver[, -1])
-indice_max <- which.max(abs(correlations))
+indice_max <- which.max(correlations)
 noms_genes <- colnames(liver)[-1]
 
 gene_top <- noms_genes[indice_max]
@@ -124,7 +124,8 @@ plot(ranks, p_values_sorted, pch = 20,
 abline(a = 0, b = 1/3116, col = "red", lwd = 2)
 
 # The p_values curve is clearly below x->x/3116 meaning the p-values
-# are significant. (Il y a un concept sous-jacent du cours mais je l'ai pas en tête là)
+# are particularly significant. Indeed, otherwise, the ordered p_values 
+# would tend towards x -> x/3116 which is clearly not the case.
 
 
 # Question 4
@@ -135,11 +136,11 @@ p_adj <- p.adjust(p_values, method = "BH")
 discoveries <- p_adj[p_adj < 0.05]
 
 length(discoveries)
-# Thus we discover 941 genes
+# Thus we discover 941 genes which are the elements of discoveries.
 
 # Question 5
 
-# We use Bonferonni
+# We use Bonferroni
 
 seuil_bonf <- 0.05 / 3116
 discoveries_bonf <- p_values[p_values < seuil_bonf]
